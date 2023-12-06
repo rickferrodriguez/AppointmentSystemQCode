@@ -78,23 +78,43 @@ public class Program
     TimeSpan closingTime = TimeSpan.FromHours(17);
     TimeSpan minAppointmentDuration = TimeSpan.FromMinutes(30);
 
-    bool anyAppointmentsMatch = appointments.Any(appointment =>
-      NormalizeDayOfTheWeek(appointment.DayOfWeek) == dayToCheck.ToLower());
+    var appointmentsForDay = appointments
+      .Where(appointment =>
+        NormalizeDayOfTheWeek(appointment.DayOfWeek) == dayToCheck.ToLower())
+      .OrderBy(appointment => appointment.StartTime)
+      .ToList();
 
-    if (anyAppointmentsMatch == false)
+    int availableSpaces = 0;
+
+    TimeSpan currentTime = openingTime;
+
+    if (appointmentsForDay.Count > 0)
     {
-      return null;
+      TimeSpan timeUntilFirstAppointment = appointmentsForDay[0].StartTime - currentTime;
+      availableSpaces += (int)(timeUntilFirstAppointment.TotalMinutes / minAppointmentDuration.TotalMinutes);
+    }
+    else
+    {
+      availableSpaces += (int)((closingTime - currentTime).TotalMinutes / minAppointmentDuration.TotalMinutes);
     }
 
-    var appointmentsForDay = appointments.Where(appointment =>
-      NormalizeDayOfTheWeek(appointment.DayOfWeek) == dayToCheck.ToLower()).ToList();
+    for (int i = 0; i < appointmentsForDay.Count - 1; i++)
+    {
+      TimeSpan timeBetweenAppointments = appointmentsForDay[i + 1].StartTime -
+                                         (appointmentsForDay[i].StartTime +
+                                          TimeSpan.FromMinutes(appointmentsForDay[i].Duration));
+      int spacesBetween = (int)(timeBetweenAppointments.TotalMinutes / minAppointmentDuration.TotalMinutes);
+      availableSpaces +=
+        Math.Max(0, spacesBetween - 1);
+    }
 
-    int totalAppointmentDuration = appointmentsForDay.Sum(appointment => appointment.Duration);
-
-    TimeSpan availableTime = closingTime - openingTime;
-    int remainingTime = (int)(availableTime.TotalMinutes - totalAppointmentDuration);
-
-    int availableSpaces = remainingTime / (int)minAppointmentDuration.TotalMinutes;
+    if (appointmentsForDay.Count > 0)
+    {
+      TimeSpan timeAfterLastAppointment = closingTime -
+                                          (appointmentsForDay.Last().StartTime +
+                                           TimeSpan.FromMinutes(appointmentsForDay.Last().Duration));
+      availableSpaces += (int)(timeAfterLastAppointment.TotalMinutes / minAppointmentDuration.TotalMinutes);
+    }
 
     return availableSpaces;
   }
